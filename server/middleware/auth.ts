@@ -1,45 +1,39 @@
 import type { Request, Response, NextFunction } from 'express'
-import { createClient } from '@supabase/supabase-js'
-
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-)
 
 export interface AuthRequest extends Request {
   userId?: string
   userRole?: string
+  userEmail?: string
 }
 
-export async function requireAuth(req: AuthRequest, res: Response, next: NextFunction) {
-  const token = req.headers.authorization?.replace('Bearer ', '')
-  if (!token) {
-    res.status(401).json({ error: 'Token não fornecido' })
+function getSession(req: Request) {
+  return req.session as { tokens?: object; userId?: string; role?: string; email?: string } | null | undefined
+}
+
+export function requireAuth(req: AuthRequest, res: Response, next: NextFunction) {
+  const s = getSession(req)
+  if (!s?.tokens) {
+    res.status(401).json({ error: 'Não autorizado. Faça login primeiro.' })
     return
   }
-
-  const { data: { user }, error } = await supabase.auth.getUser(token)
-  if (error || !user) {
-    res.status(401).json({ error: 'Token inválido' })
-    return
-  }
-
-  req.userId = user.id
+  req.userId = s.userId
+  req.userRole = s.role
+  req.userEmail = s.email
   next()
 }
 
-export async function requireAdmin(req: AuthRequest, res: Response, next: NextFunction) {
-  await requireAuth(req, res, async () => {
-    const profile = await import('../db/prisma.js').then(m => m.default.profile.findUnique({
-      where: { id: req.userId },
-    }))
-
-    if (!profile || profile.role !== 'admin') {
-      res.status(403).json({ error: 'Acesso restrito a administradores' })
-      return
-    }
-
-    req.userRole = 'admin'
-    next()
-  })
+export function requireAdmin(req: AuthRequest, res: Response, next: NextFunction) {
+  const s = getSession(req)
+  if (!s?.tokens) {
+    res.status(401).json({ error: 'Não autorizado. Faça login primeiro.' })
+    return
+  }
+  if (s.role !== 'admin') {
+    res.status(403).json({ error: 'Acesso restrito a administradores' })
+    return
+  }
+  req.userId = s.userId
+  req.userRole = 'admin'
+  req.userEmail = s.email
+  next()
 }

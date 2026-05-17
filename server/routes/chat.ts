@@ -1,49 +1,79 @@
 import { Router } from 'express'
 import { GoogleGenerativeAI, type Content } from '@google/generative-ai'
-import prisma from '../db/prisma.js'
 import { requireAuth, type AuthRequest } from '../middleware/auth.js'
+import { getAdminTokens } from '../services/tokenStore.js'
+import {
+  salvarMensagemChat,
+  carregarMensagensChat,
+  carregarProgressoPorTeam,
+  buscarTeamPorId,
+  buscarSkillAtiva,
+  atualizarProgresso,
+} from '../services/sheetsService.js'
+
 
 const router = Router()
 
+function getTokens(req: AuthRequest) {
+  const s = req.session as { tokens?: object } | null | undefined
+  return getAdminTokens() || s?.tokens
+}
+
 router.get('/:teamId', requireAuth, async (req: AuthRequest, res) => {
+  const tokens = getTokens(req)
+  if (!tokens) { res.status(401).json({ error: 'Tokens não disponíveis' }); return }
+
   const teamId = req.params.teamId as string
-  const messages = await prisma.chatMessage.findMany({
-    where: { teamId },
-    orderBy: { createdAt: 'asc' },
-  })
-  res.json(messages)
+  const messages = await carregarMensagensChat(teamId, tokens)
+  res.json(messages.map(m => ({
+    id: m.id,
+    role: m.role,
+    content: m.content,
+    createdAt: m.created_at,
+  })))
 })
 
 router.post('/:teamId', requireAuth, async (req: AuthRequest, res) => {
+  const tokens = getTokens(req)
+  if (!tokens) { res.status(401).json({ error: 'Tokens não disponíveis' }); return }
+
   const teamId = req.params.teamId as string
   const { content } = req.body as { content: string }
 
-  const userMessage = await prisma.chatMessage.create({
-    data: { teamId, role: 'user', content },
-  })
+  await salvarMensagemChat({
+    id: crypto.randomUUID(),
+    team_id: teamId,
+    role: 'user',
+    content,
+    stage: '',
+  }, tokens)
 
-  const team = await prisma.team.findUnique({
-    where: { id: teamId },
-    include: {
-      progress: { orderBy: { stage: 'asc' } },
-      chatMessages: { orderBy: { createdAt: 'desc' }, take: 20 },
-    },
-  })
-
+  const team = await buscarTeamPorId(teamId, tokens)
   if (!team) {
     res.status(404).json({ error: 'Time não encontrado' })
     return
   }
 
-  const skill = await prisma.skillVersion.findFirst({
-    where: { isActive: true },
-  })
+  const [allProgress, chatMessages] = await Promise.all([
+    carregarProgressoPorTeam(teamId, tokens),
+    carregarMensagensChat(teamId, tokens),
+  ])
+  const recentMessages = chatMessages.slice(-20)
 
-  const systemContent = buildSystemPrompt(skill, {
-    currentStage: team.currentStage,
-    progress: team.progress,
-    chatMessages: team.chatMessages,
-  })
+  const skill = await buscarSkillAtiva(tokens)
+
+  const systemContent = buildSystemPrompt(
+    skill ? { content_md: skill.content_md } : null,
+    {
+      currentStage: parseInt(team.current_stage || '1'),
+      progress: allProgress.map(p => ({
+        stage: parseInt(p.stage),
+        status: p.status,
+        stageOutput: p.stage_output || null,
+      })),
+      chatMessages: recentMessages.map(m => ({ role: m.role, content: m.content })),
+    },
+  )
 
   const geminiApiKey = process.env.GEMINI_API_KEY
   if (geminiApiKey && geminiApiKey !== 'sua_chave_gemini') {
@@ -54,7 +84,7 @@ router.post('/:teamId', requireAuth, async (req: AuthRequest, res) => {
         systemInstruction: systemContent,
       })
 
-      const history: Content[] = team.chatMessages
+      const history: Content[] = recentMessages
         .filter(m => m.role !== 'system')
         .reverse()
         .slice(0, 20)
@@ -78,34 +108,32 @@ router.post('/:teamId', requireAuth, async (req: AuthRequest, res) => {
         cleanContent = aiText.replace(/\[ETAPA_CONCLUIDA:\s*\d\]/g, '').trim()
       }
 
-      const aiMessage = await prisma.chatMessage.create({
-        data: {
-          teamId,
-          role: 'assistant',
-          content: cleanContent,
-          stage: stageCompleted ?? undefined,
-        },
-      })
+      const aiMsgId = crypto.randomUUID()
+      await salvarMensagemChat({
+        id: aiMsgId,
+        team_id: teamId,
+        role: 'assistant',
+        content: cleanContent,
+        stage: stageCompleted ? String(stageCompleted) : '',
+      }, tokens)
 
       if (stageCompleted) {
-        await prisma.teamProgress.updateMany({
-          where: { teamId, stage: stageCompleted },
-          data: {
+        const progressItem = allProgress.find(p => parseInt(p.stage) === stageCompleted)
+        if (progressItem) {
+          await atualizarProgresso(progressItem.id, {
             status: 'completed',
-            stageOutput: cleanContent.slice(0, 500),
-            completedAt: new Date(),
-          },
-        })
-
-        if (stageCompleted === 7) {
-          await prisma.team.update({
-            where: { id: teamId },
-            data: { status: 'completed' },
-          })
+            stage_output: cleanContent.slice(0, 500),
+            completed_at: new Date().toISOString(),
+          }, tokens)
         }
       }
 
-      res.json({ userMessage, aiMessage, content: cleanContent, stageCompleted })
+      res.json({
+        userMessage: { id: '', role: 'user', content, createdAt: new Date().toISOString() },
+        aiMessage: { id: aiMsgId, role: 'assistant', content: cleanContent, createdAt: new Date().toISOString() },
+        content: cleanContent,
+        stageCompleted,
+      })
     } catch (err: unknown) {
       console.error('Gemini API error:', err)
       const isQuota = err && typeof err === 'object' && 'status' in err &&
@@ -121,7 +149,7 @@ router.post('/:teamId', requireAuth, async (req: AuthRequest, res) => {
   }
 })
 
-function buildSystemPrompt(skill: { contentMd: string } | null, team: {
+function buildSystemPrompt(skill: { content_md: string } | null, team: {
   currentStage: number
   progress: { stage: number; status: string; stageOutput: string | null }[]
   chatMessages: { role: string; content: string }[]
@@ -133,7 +161,7 @@ function buildSystemPrompt(skill: { contentMd: string } | null, team: {
 
   let prompt = ''
   if (skill) {
-    prompt += skill.contentMd + '\n\n---\n\n'
+    prompt += skill.content_md + '\n\n---\n\n'
   }
 
   prompt += 'ESTADO ATUAL DA JORNADA DO TIME:\n'

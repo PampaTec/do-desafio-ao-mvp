@@ -164,7 +164,7 @@ export function MemberChat() {
         )}
         {messages.length === 0 && !typing && (
           <div className="flex flex-col items-center justify-center h-full text-secondary text-sm">
-            <p>Comece a conversa com seu consultor de Design Thinking.</p>
+            <p>Qual desafio ou problema você busca orientação para criar uma solução que possa se tornar oportunidade de negócio?</p>
           </div>
         )}
         <div ref={endRef} />

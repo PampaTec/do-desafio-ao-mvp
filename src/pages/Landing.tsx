@@ -2,7 +2,7 @@ import { useAuth } from '../hooks/useAuth'
 import { Navigate } from 'react-router-dom'
 
 export function Landing() {
-  const { session, profile, signIn, loading } = useAuth()
+  const { profile, signIn, loading } = useAuth()
 
   if (loading) {
     return (
@@ -12,7 +12,7 @@ export function Landing() {
     )
   }
 
-  if (session && profile) {
+  if (profile) {
     if (profile.role === 'admin') return <Navigate to="/admin" replace />
     return <Navigate to="/team" replace />
   }

@@ -32,99 +32,106 @@ Crie uma aplicação web full-stack chamada **"Desafio ao MVP"** para o **PampaT
 
 - **Frontend:** React + TypeScript + Tailwind CSS (Vite)
 - **Backend:** Node.js + Express + TypeScript
-- **Banco de dados:** PostgreSQL (Supabase)
-- **ORM:** Prisma
-- **IA:** Gemini API — modelo `gemini-2.0-flash` (cota gratuita generosa, ideal para MVP). O usuário faz login com Google (OAuth) e o backend utiliza o token de acesso OAuth para chamar a Gemini API em nome do usuário, consumindo a cota da própria conta Google do usuário. O escopo OAuth deve incluir permissão para a Gemini API.
-- **Autenticação:** Supabase Auth (Google OAuth)
-- **Deploy:** Render.com (100% gratuito) + Supabase (camada gratuita)
+- **Banco de dados:** Google Sheets (via `googleapis` SDK)
+- **Autenticação:** Google OAuth 2.0 direto (sem intermediário — backend lida com o fluxo OAuth)
+- **IA:** Gemini API — modelo `gemini-2.0-flash`
+- **Deploy:** Render.com (100% gratuito)
 
 ---
 
-## BANCO DE DADOS (Supabase — esquema completo)
+## BANCO DE DADOS (Google Sheets)
 
-```sql
--- Usuários e perfis
-CREATE TABLE profiles (
-  id UUID PRIMARY KEY REFERENCES auth.users(id),
-  google_id TEXT UNIQUE,
-  email TEXT UNIQUE NOT NULL,
-  name TEXT,
-  role TEXT CHECK (role IN ('admin', 'member')) DEFAULT 'member',
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
+Uma única planilha Google com **7 abas**, cada uma funcionando como uma "tabela".
+As abas são criadas automaticamente na primeira requisição (se não existirem).
 
--- Times de empreendedores
-CREATE TABLE teams (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  project_name TEXT NOT NULL,
-  created_by UUID REFERENCES profiles(id),
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  current_stage INT DEFAULT 1 CHECK (current_stage BETWEEN 1 AND 7),
-  status TEXT CHECK (status IN ('active', 'completed', 'paused')) DEFAULT 'active'
-);
+### Aba `PROFILES`
 
--- Membros de cada time
-CREATE TABLE team_members (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  team_id UUID REFERENCES teams(id) ON DELETE CASCADE,
-  user_id UUID REFERENCES profiles(id),
-  invited_email TEXT,
-  joined_at TIMESTAMPTZ DEFAULT NOW()
-);
+| Col | Cabeçalho | Descrição |
+|-----|-----------|-----------|
+| A | id | UUID do perfil |
+| B | google_id | ID único do Google |
+| C | email | E-mail do usuário (único) |
+| D | name | Nome do usuário |
+| E | role | `admin` ou `member` |
+| F | created_at | ISO timestamp |
 
--- Histórico de chat por time
-CREATE TABLE chat_messages (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  team_id UUID REFERENCES teams(id) ON DELETE CASCADE,
-  role TEXT CHECK (role IN ('user', 'assistant', 'system')) NOT NULL,
-  content TEXT NOT NULL,
-  stage INT,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
+### Aba `TEAMS`
 
--- Progresso por etapa
-CREATE TABLE team_progress (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  team_id UUID REFERENCES teams(id) ON DELETE CASCADE,
-  stage INT NOT NULL CHECK (stage BETWEEN 1 AND 7),
-  status TEXT CHECK (status IN ('pending', 'in_progress', 'completed')) DEFAULT 'pending',
-  stage_output TEXT,
-  completed_at TIMESTAMPTZ,
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
+| Col | Cabeçalho | Descrição |
+|-----|-----------|-----------|
+| A | id | UUID do time |
+| B | project_name | Nome do projeto |
+| C | created_by | UUID de quem criou |
+| D | created_at | ISO timestamp |
+| E | current_stage | Etapa atual (1–7) |
+| F | status | `active`, `completed`, `paused` |
 
--- Versões da skill
-CREATE TABLE skill_versions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  version_label TEXT NOT NULL,
-  content_md TEXT NOT NULL,
-  created_by UUID REFERENCES profiles(id),
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  is_active BOOLEAN DEFAULT FALSE
-);
+### Aba `TEAM_MEMBERS`
 
--- Log de auditoria do editor de skill
-CREATE TABLE skill_audit_log (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  admin_id UUID REFERENCES profiles(id),
-  action TEXT NOT NULL,
-  fields_changed JSONB,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-```
+| Col | Cabeçalho | Descrição |
+|-----|-----------|-----------|
+| A | id | UUID do vínculo |
+| B | team_id | UUID do time |
+| C | user_id | UUID do profile (preenchido após login) |
+| D | invited_email | E-mail convidado |
+| E | joined_at | ISO timestamp |
+
+### Aba `CHAT_MESSAGES`
+
+| Col | Cabeçalho | Descrição |
+|-----|-----------|-----------|
+| A | id | UUID da mensagem |
+| B | team_id | UUID do time |
+| C | role | `user`, `assistant`, `system` |
+| D | content | Texto da mensagem |
+| E | stage | Etapa concluída (se houver tag) |
+| F | created_at | ISO timestamp |
+
+### Aba `TEAM_PROGRESS`
+
+| Col | Cabeçalho | Descrição |
+|-----|-----------|-----------|
+| A | id | UUID do progresso |
+| B | team_id | UUID do time |
+| C | stage | Número da etapa (1–7) |
+| D | status | `pending`, `in_progress`, `completed` |
+| E | stage_output | Texto de saída da etapa |
+| F | completed_at | ISO timestamp |
+| G | updated_at | ISO timestamp |
+
+### Aba `SKILL_VERSIONS`
+
+| Col | Cabeçalho | Descrição |
+|-----|-----------|-----------|
+| A | id | UUID da versão |
+| B | version_label | Rótulo (ex: v1.1.0) |
+| C | content_md | Markdown completo da skill |
+| D | created_by | UUID de quem criou |
+| E | created_at | ISO timestamp |
+| F | is_active | `true` ou `false` |
+
+### Aba `SKILL_AUDIT_LOG`
+
+| Col | Cabeçalho | Descrição |
+|-----|-----------|-----------|
+| A | id | UUID do registro |
+| B | admin_id | UUID do admin |
+| C | action | `create`, `restore`, etc |
+| D | fields_changed | JSON com os campos alterados |
+| E | created_at | ISO timestamp |
 
 ---
 
 ## AUTENTICAÇÃO E CONTROLE DE ACESSO
 
-- Login via **conta google**
-- Cadastro de novos usuários 
-- Após login, o backend verifica o campo `role` na tabela `profiles`:
+- Login via **conta Google** usando OAuth 2.0 direto (fluxo server-side)
+- O backend redireciona para o Google, recebe o callback, troca o código por tokens, e armazena a sessão em cookie assinado (`cookie-session`)
+- Após login, o backend verifica o campo `role` na aba `PROFILES`:
   - `role = 'admin'` → redireciona para `/admin`
   - `role = 'member'` → redireciona para `/team`
-- Admins são cadastrados manualmente pelo time PampaTec (seed inicial ou painel)
-- Novos usuários via cadastro são criados como `member` por padrão
-- Implemente middleware de rota protegida para todas as páginas autenticadas
+- Admins são definidos pelo `ADMIN_EMAIL` no `.env`
+- Novos usuários são criados como `member` por padrão
+- Middleware de rota protegida verifica a sessão pelo cookie
 
 ---
 
@@ -339,17 +346,12 @@ registra audit_log → toast confirmação
 
 ## SEED INICIAL (para desenvolvimento)
 
-```sql
--- Admin inicial
-INSERT INTO profiles (id, google_id, email, name, role) VALUES 
-  ('uuid-admin-1', 'google-oauth-id-admin', 'admin@pampatec.org', 'Equipe PampaTec', 'admin');
+Não há seed SQL. Ao fazer login pela primeira vez como admin (`ADMIN_EMAIL` no `.env`):
+1. O backend cria seu perfil na aba `PROFILES` automaticamente
+2. A versão inicial da skill deve ser adicionada manualmente via `/skill-editor`
+3. As abas da planilha são criadas automaticamente na primeira requisição
 
--- Versão inicial da skill (cole o conteúdo completo do arquivo skill-desafio-ao-mvp.md)
-INSERT INTO skill_versions (version_label, content_md, created_by, is_active) VALUES 
-  ('v1.1.0 — inicial', '[CONTEÚDO DO ARQUIVO skill-desafio-ao-mvp.md]', 'uuid-admin-1', true);
-```
-
-**Nota:** O `google_id` deve ser obtido do payload do token OAuth do Google no momento do login.
+**Nota:** A planilha Google precisa estar criada e o `PROGRESS_SHEET_ID` configurado no `.env`.
 
 ---
 
@@ -368,8 +370,8 @@ Uma aplicação web funcional, mobile-first, visualmente premium com identidade 
 ## PLANO DE IMPLANTAÇÃO (LOCALHOST-FIRST)
 
 O desenvolvimento segue uma estratégia **local-first**: todo o sistema é desenvolvido e testado
-localmente antes de qualquer deploy em produção. O PostgreSQL roda local, o Prisma sincroniza
-o schema, e a Gemini API é consumida via chave de API (fallback).
+localmente antes de qualquer deploy em produção. O banco é uma planilha Google, e a Gemini API
+é consumida via chave de API.
 
 ---
 
@@ -378,18 +380,17 @@ o schema, e a Gemini API é consumida via chave de API (fallback).
 | Atividade | Status | Descrição |
 |-----------|--------|-----------|
 | 1.1 Inicializar projeto | ✅ | Vite + React + Express + TypeScript configurados |
-| 1.2 Configurar PostgreSQL local | ✅ | Banco `desafio_ao_mvp_local`, schema `auth`, tabela mock `auth.users` |
-| 1.3 Schema Prisma + push | ✅ | 7 modelos (profiles, teams, team_members, chat_messages, team_progress, skill_versions, skill_audit_log) |
-| 1.4 Seed inicial | ✅ | Admin `admin@pampatec.org` + skill inicial de `skill-desafio-ao-mvp.md` |
-| 1.5 Variáveis de ambiente | ✅ | `.env` (backend) e `.env.local` (frontend) criados |
-| 1.6 ESLint + TypeScript | ✅ | `eslint .` limpo, `tsc --noEmit` limpo |
-| 1.7 Servidores rodando | ✅ | Backend `localhost:3001`, Frontend `localhost:5174` |
+| 1.2 Criar planilha Google | ✅ | 7 abas: PROFILES, TEAMS, TEAM_MEMBERS, CHAT_MESSAGES, TEAM_PROGRESS, SKILL_VERSIONS, SKILL_AUDIT_LOG |
+| 1.3 Google Cloud OAuth | ✅ | Client ID + Secret configurados no `.env` |
+| 1.4 Variáveis de ambiente | ✅ | `.env` (backend) e `.env.local` (frontend) criados |
+| 1.5 ESLint + TypeScript | ✅ | `eslint .` limpo, `tsc --noEmit` limpo |
+| 1.6 Servidores rodando | ✅ | Backend `localhost:3001`, Frontend `localhost:5174` |
 
 ### Etapa 2 — Autenticação e Rotas
 
 | Atividade | Status | Descrição |
 |-----------|--------|-----------|
-| 2.1 Supabase Auth + Google OAuth | ⚠️ | Configurado no frontend e backend; requer credenciais Supabase reais (placeholder `.env`) |
+| 2.1 Google OAuth direto (server-side) | ✅ | Backend lida com o fluxo OAuth, sessão em cookie |
 | 2.2 AuthContext + ProtectedRoute | ✅ | Provider de sessão, rotas protegidas por role |
 | 2.3 Landing `/` | ✅ | Logo PampaTec + "Entrar com Google" |
 | 2.4 Redirecionamento condicional | ✅ | role=admin → `/admin`, member c/ time → `/team`, member s/ time → `/waiting` |
@@ -441,13 +442,12 @@ o schema, e a Gemini API é consumida via chave de API (fallback).
 | 7.2 ESLint | ✅ | `eslint .` limpo |
 | 7.3 Testes | ⏳ | Pendente (Jest + Playwright) |
 
-### Etapa 8 — Deploy Futuro (Render + Supabase)
+### Etapa 8 — Deploy Futuro (Render + Google Sheets)
 
 | Atividade | Status | Descrição |
 |-----------|--------|-----------|
 | 8.1 Deploy Backend no Render | 📄 | Guia completo em `deploy-render.md` |
 | 8.2 Deploy Frontend no Render | 📄 | Guia completo em `deploy-render.md` |
-| 8.3 Supabase produção | 📄 | Guia completo em `deploy-render.md` |
 
 ---
 
@@ -465,14 +465,15 @@ o schema, e a Gemini API é consumida via chave de API (fallback).
 │  React App       │           │  Express API Server       │
 │  (HMR)           │           │  Porta 3001               │
 │                  │           ├──────────────────────────┤
-│  Auth: Supabase  │           │  Prisma ORM               │
-│  Client SDK      │           │  Gemini API SDK           │
+│  Auth: cookie    │           │  googleapis SDK           │
+│  (sessão)        │           │  Gemini API SDK           │
+│                  │           │  cookie-session           │
 └──────────────────┘           └────────┬─────────────────┘
                                         │
                                         ▼
                              ┌──────────────────────┐
-                             │   PostgreSQL 16       │
-                             │   banco local         │
+                             │   Google Sheets       │
+                             │   (7 abas = 7 tabelas)│
                              └──────────────────────┘
 ```
 
@@ -480,20 +481,21 @@ o schema, e a Gemini API é consumida via chave de API (fallback).
 
 ```env
 # Backend (.env)
-SUPABASE_URL=https://seu-projeto.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=sua_service_role_key
-DATABASE_URL=postgres://usuario:senha@localhost:5432/desafio_ao_mvp_local
+PORT=3001
 FRONTEND_URL=http://localhost:5174
+GOOGLE_CLIENT_ID=seu_client_id.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=seu_client_secret
+GOOGLE_REDIRECT_URI=http://localhost:3001/auth/google/callback
+PROGRESS_SHEET_ID=id_da_sua_planilha
+ADMIN_EMAIL=seu@email.com
+COOKIE_KEY=sua_chave_secreta
 GEMINI_API_KEY=sua_chave_gemini
 
 # Frontend (.env.local)
-VITE_SUPABASE_URL=https://seu-projeto.supabase.co
-VITE_SUPABASE_ANON_KEY=sua_chave_anon
+VITE_API_URL=http://localhost:3001
 ```
 
 **Nota:** A Gemini API é chamada com chave de API (`GEMINI_API_KEY`) no ambiente local.
-Em produção, pode-se usar o token OAuth do usuário logado (escopo Gemini),
-configurado via Supabase e Google Cloud Console.
 
 ---
 
@@ -507,13 +509,13 @@ Itens descritos no escopo original que **NÃO** foram implementados ou estão in
 | G2 | **Streaming da resposta da IA** | `/team` (chat) | ❌ | `chat.sendMessage` aguarda resposta completa; não há SSE/chunk streaming na UI |
 | G3 | **Botão "Testar Skill"** | `/skill-editor` | ❌ | Modal de chat simulado não implementado |
 | G4 | **Indicador "Skill em uso por X times"** | `/skill-editor` | ❌ | Rota `/api/stats` retorna `skillsUsing`, mas não é exibido no editor |
-| G5 | **Adicionar/Remover membros** | `/admin/team/:id` | ❌ | Apenas exibe membros; sem botão add/remove |
+| G5 | **Adicionar/Remover membros** | `/admin/team/:id` | ✅ | Botões add/remove implementados com resolução de nomes de perfil |
 | G6 | **Arquivar/Pausar time** | `/admin/team/:id` | ❌ | Apenas "Excluir" disponível; sem opção de pausar/arquivar |
 | G7 | **Auto-redirect `/waiting` → `/team`** | `/waiting` | ❌ | Sem polling para detectar criação do time |
 | G8 | **Botão "Avançar etapa" no chat do membro** | `/team` | ❌ | Botão existe apenas no admin; membro não consegue solicitar avanço manual |
 | G9 | **Envio de e-mail com magic link** | Criação de time | ❌ | `invitedEmail` é salvo, mas nenhum e-mail é disparado |
 | G10 | **Logotipo PampaTec (SVG/PNG oficial)** | Global | ⚠️ | Usa SVG genérico (retângulos verdes) em vez do `logo-pampatec.png` ou SVG inline oficial |
-| G11 | **Credenciais Supabase reais** | `.env` / `.env.local` | ❌ | Placeholders `sua_chave_*` — autenticação Google OAuth não funcional sem config |
+| G11 | **Credenciais Google OAuth reais** | `.env` | ✅ | Migrado para Google OAuth direto + Google Sheets. Requer Client ID/Secret do Google Cloud. |
 | G12 | **Chave Gemini API real** | `.env` | ✅ | Trocado para `gemini-2.0-flash` (cota gratuita ~10x maior que 2.5-pro). Chave configurada e funcional. |
 | G13 | **Testes automatizados** | — | ❌ | Nenhum teste (unit, integration, e2e) implementado |
 | G14 | **Exportar jornada (.md)** | `/team` | ❌ | Planejado para próxima sprint (Alternativa 2) |

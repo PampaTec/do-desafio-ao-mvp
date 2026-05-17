@@ -38,45 +38,12 @@ info "Verificando dependências..."
 
 command -v node >/dev/null 2>&1 || { erro "Node.js não encontrado"; exit 1; }
 command -v npm  >/dev/null 2>&1 || { erro "npm não encontrado"; exit 1; }
-command -v psql >/dev/null 2>&1 || { erro "psql não encontrado"; exit 1; }
 
 NODE_VER=$(node --version)
 NPM_VER=$(npm --version)
 ok "Node.js $NODE_VER / npm $NPM_VER"
 
-# ─── 2. Verificar PostgreSQL ────────────────────────────────
-info "Verificando PostgreSQL..."
-if pg_isready -q 2>/dev/null; then
-  ok "PostgreSQL está rodando (localhost:5432)"
-else
-  erro "PostgreSQL não está rodando. Execute: sudo systemctl start postgresql"
-  exit 1
-fi
-
-# ─── 3. Verificar / criar banco ─────────────────────────────
-DB_EXISTE=$(psql -lqt 2>/dev/null | cut -d\| -f1 | tr -d ' ' | grep -c "^desafio_ao_mvp_local$" || true)
-if [ "$DB_EXISTE" -eq 0 ]; then
-  aviso "Banco 'desafio_ao_mvp_local' não existe. Criando..."
-  createdb desafio_ao_mvp_local
-  psql -d desafio_ao_mvp_local -c "
-    CREATE SCHEMA IF NOT EXISTS auth;
-    CREATE TABLE IF NOT EXISTS auth.users (id UUID PRIMARY KEY);
-  " >/dev/null 2>&1
-  ok "Banco criado com schema auth."
-else
-  # Garantir que schema auth existe
-  SCHEMA_EXISTE=$(psql -d desafio_ao_mvp_local -t -c "SELECT COUNT(*) FROM information_schema.schemata WHERE schema_name='auth'" 2>/dev/null | tr -d ' ')
-  if [ "$SCHEMA_EXISTE" = "0" ]; then
-    aviso "Schema 'auth' não existe. Criando..."
-    psql -d desafio_ao_mvp_local -c "
-      CREATE SCHEMA IF NOT EXISTS auth;
-      CREATE TABLE IF NOT EXISTS auth.users (id UUID PRIMARY KEY);
-    " >/dev/null 2>&1
-  fi
-  ok "Banco 'desafio_ao_mvp_local' OK."
-fi
-
-# ─── 4. Verificar .env ──────────────────────────────────────
+# ─── 2. Verificar .env ──────────────────────────────────────
 if [ ! -f .env ]; then
   aviso "Arquivo .env não encontrado. Criando a partir de .env.example..."
   if [ -f .env.example ]; then
@@ -88,16 +55,7 @@ if [ ! -f .env ]; then
   fi
 fi
 
-if [ ! -f .env.local ]; then
-  aviso "Arquivo .env.local não encontrado. Criando template..."
-  cat > .env.local <<-EOF
-VITE_SUPABASE_URL=https://seu-projeto.supabase.co
-VITE_SUPABASE_ANON_KEY=sua_chave_anon_do_supabase
-EOF
-  aviso "Edite .env.local com suas credenciais do Supabase."
-fi
-
-# ─── 5. npm install ─────────────────────────────────────────
+# ─── 3. npm install ─────────────────────────────────────────
 info "Instalando dependências (se necessário)..."
 if [ ! -d node_modules ] || [ ! -f node_modules/.package-lock.json ]; then
   npm install
@@ -106,23 +64,19 @@ else
   ok "node_modules OK."
 fi
 
-# ─── 6. Prisma generate + push ──────────────────────────────
-info "Sincronizando banco com Prisma..."
-npx prisma generate >/dev/null 2>&1
-npx prisma db push --accept-data-loss 2>&1 | grep -v "^$" | tail -1
-ok "Schema sincronizado."
-
-# ─── 7. Seed (se profiles vazio) ────────────────────────────
-QTD_PROFILES=$(psql -d desafio_ao_mvp_local -t -c "SELECT COUNT(*) FROM profiles" 2>/dev/null | tr -d ' ')
-if [ -z "$QTD_PROFILES" ] || [ "$QTD_PROFILES" -eq 0 ]; then
-  info "Executando seed inicial..."
-  npx prisma db seed >/dev/null 2>&1
-  ok "Seed concluído (admin + skill inicial)."
+# ─── 4. Inicializar planilha Google (se admin logado) ───────
+if [ -f .admin-tokens.json ]; then
+  info "Tokens admin encontrados. Verificando abas da planilha..."
+  if npm run sheets:init 2>/dev/null; then
+    ok "Planilha OK."
+  else
+    aviso "Não foi possível inicializar a planilha. Faça login como admin primeiro."
+  fi
 else
-  ok "Banco já possui dados — seed pulado."
+  aviso "Nenhum token admin. As abas serão criadas automaticamente no primeiro login."
 fi
 
-# ─── 8. Parar processos nas portas conflitantes ─────────────
+# ─── 5. Parar processos nas portas conflitantes ─────────────
 info "Liberando portas..."
 for PORT in 3001 5174; do
   PID=$(lsof -ti :"$PORT" 2>/dev/null || true)
@@ -135,13 +89,12 @@ for PORT in 3001 5174; do
   fi
 done
 
-# ─── 9. Iniciar backend ─────────────────────────────────────
+# ─── 6. Iniciar backend ─────────────────────────────────────
 info "Iniciando backend (Express, porta 3001)..."
 npm run dev:server &
 BACKEND_PID=$!
 sleep 2
 
-# Aguardar backend ficar pronto
 for i in $(seq 1 10); do
   if curl -sf http://localhost:3001/api/health >/dev/null 2>&1; then
     ok "Backend rodando em http://localhost:3001"
@@ -154,7 +107,7 @@ for i in $(seq 1 10); do
   sleep 0.5
 done
 
-# ─── 10. Iniciar frontend ──────────────────────────────────
+# ─── 7. Iniciar frontend ────────────────────────────────────
 info "Iniciando frontend (Vite, porta 5174)..."
 npm run dev &
 FRONTEND_PID=$!
@@ -167,14 +120,14 @@ else
   sleep 2
 fi
 
-# ─── 11. Verificar proxy ────────────────────────────────────
+# ─── 8. Verificar proxy ─────────────────────────────────────
 if curl -sf http://localhost:5174/api/health >/dev/null 2>&1; then
   ok "Proxy Vite → Backend funcionando"
 else
   aviso "Proxy Vite pode não estar respondendo (normal se frontend ainda estiver compilando)"
 fi
 
-# ─── 12. Resumo final ───────────────────────────────────────
+# ─── 9. Resumo final ────────────────────────────────────────
 echo ""
 echo -e "${VERDE}══════════════════════════════════════════════════════${RESET}"
 echo -e "${VERDE}  Sistema rodando!${RESET}"

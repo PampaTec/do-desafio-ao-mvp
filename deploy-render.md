@@ -1,41 +1,53 @@
 # Deploy no Render.com
 
 > Desafio ao MVP · PampaTec
-> Frontend (Static Site) + Backend (Web Service) + Supabase (PostgreSQL)
+> Frontend (Static Site) + Backend (Web Service) + Google Sheets (banco)
 
 ---
 
 ## Pré-requisitos
 
-- Conta no [Render.com](https://render.com) (plano gratuita)
-- Conta no [Supabase](https://supabase.com) já configurada com Google OAuth
+- Conta no [Render.com](https://render.com) (plano gratuito)
+- Conta no [Google Cloud Console](https://console.cloud.google.com) com APIs Sheets/Drive ativadas
+- Planilha Google criada com as 7 abas (ou deixe o app criar automaticamente)
 - Repositório Git do projeto (GitHub, GitLab ou Bitbucket)
 
 ---
 
-## Etapa 1 — Preparar o Banco de Dados (Supabase)
+## Etapa 1 — Preparar o Google Cloud
 
-### 1.1 Obter a connection string do banco
+### 1.1 Criar projeto e ativar APIs
 
-1. Supabase Dashboard → **Project Settings → Database**
-2. Em **Connection string → Node.js** copie a URI ou use a senha definida no reset
-3. Anote — será usada no backend em produção
+1. [Google Cloud Console](https://console.cloud.google.com) → **Novo Projeto**
+2. **APIs & Services → Library**
+3. Ative:
+   - **Google Sheets API**
+   - **Google Drive API**
+   - **Google People API** (para dados do perfil do usuário)
 
-> ⚠️ **Nota:** Se seu ISP não tem IPv6, o comando `prisma db push` não funcionará localmente.
-> Use o **SQL Editor** do Supabase Dashboard (ver `prisma/schema.prisma` para criar as tabelas manualmente).
+### 1.2 Configurar OAuth Consent Screen
 
-### 1.2 Aplicar schema e seed
+1. **APIs & Services → OAuth consent screen**
+2. Tipo: **External**
+3. Preencha: App name (ex: "Desafio ao MVP"), User support email, Developer contact
+4. Scopes: adicione `userinfo.email`, `userinfo.profile`, `drive`, `spreadsheets`
+5. Test users: adicione os e-mails dos admins
 
-Se tiver IPv6, execute no terminal:
+### 1.3 Criar OAuth Client ID
 
-```bash
-DATABASE_URL="postgresql://postgres:PampaTec2026@db.yduaeewtixrxdgbhyety.supabase.co:5432/postgres" npx prisma db push
-DATABASE_URL="postgresql://postgres:PampaTec2026@db.yduaeewtixrxdgbhyety.supabase.co:5432/postgres" npx prisma db seed
-```
+1. **APIs & Services → Credentials → Create Credentials → OAuth client ID**
+2. Application type: **Web application**
+3. Authorized redirect URIs:
+   ```
+   http://localhost:3001/auth/google/callback
+   https://SEU-WEB-SERVICE.onrender.com/auth/google/callback
+   ```
+4. Anote o **Client ID** e **Client Secret**
 
-Caso contrário, abra **Supabase Dashboard → SQL Editor** e execute os SQLs de `prisma/schema.prisma` e `prisma/seed.ts`.
+### 1.4 Compartilhar a planilha
 
-Isso cria as 7 tabelas + admin `emersonrizzatti@unipampa.edu.br` + skill inicial.
+1. Crie uma planilha Google (ou use `PROGRESS_SHEET_ID` do `.env`)
+2. Compartilhe a planilha com o e-mail do admin (dono) — as abas serão criadas automaticamente na primeira requisição
 
 ---
 
@@ -51,9 +63,9 @@ Isso cria as 7 tabelas + admin `emersonrizzatti@unipampa.edu.br` + skill inicial
 |-------|-------|
 | **Name** | `desafio-mvp-web-service` |
 | **Region** | `Oregon (US West)` (menor latência Brazil) |
-| **Branch** | `main` |
+| **Branch** | `feat/google-sheets-migration` |
 | **Runtime** | `Node` |
-| **Build Command** | `npm install && npx prisma generate` |
+| **Build Command** | `npm install` |
 | **Start Command** | `npx tsx server/index.ts` |
 | **Plan** | `Free` |
 
@@ -63,18 +75,23 @@ Adicione em **Environment Variables**:
 
 | Variável | Valor |
 |----------|-------|
-| `SUPABASE_URL` | URL do seu projeto Supabase (`https://yduaeewtixrxdgbhyety.supabase.co`) |
-| `SUPABASE_SERVICE_ROLE_KEY` | eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlkdWFlZXd0aXhyeGRnYmh5ZXR5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3ODk5MDM3MCwiZXhwIjoyMDk0NTY2MzcwfQ.nR-DyUvZLARxMVmL8CKwVUxotvY-OSuu52vWKIayMwo |
-| `DATABASE_URL` | postgresql://postgres:PampaTec2026@db.yduaeewtixrxdgbhyety.supabase.co:5432/postgres |
+| `PORT` | `10000` (definido pelo Render) |
+| `NODE_ENV` | `production` |
 | `FRONTEND_URL` | `https://desafio-mvp.onrender.com` |
-| `GEMINI_API_KEY` | `AIza...` (chave da Gemini API) |
+| `GOOGLE_CLIENT_ID` | Seu Client ID do Google Cloud |
+| `GOOGLE_CLIENT_SECRET` | Seu Client Secret do Google Cloud |
+| `GOOGLE_REDIRECT_URI` | `https://SEU-WEB-SERVICE.onrender.com/auth/google/callback` |
+| `PROGRESS_SHEET_ID` | ID da planilha Google (ex: `1gKH4eS4SatIMPrWy2qAGvqc6CtFlLaIdqx87uPbw8Do`) |
+| `ADMIN_EMAIL` | `emersonrizzatti@unipampa.edu.br` |
+| `COOKIE_KEY` | Uma string aleatória forte para assinar cookies (ex: `openssl rand -hex 32`) |
+| `GEMINI_API_KEY` | Chave da Gemini API |
 | `NODE_VERSION` | `22` |
 
 ### 2.3 Deploy
 
-Clique **Create Web Service**. O Render vai fazer o build e deploy automático.
+Clique **Create Web Service**. Anote a URL gerada.
 
-Anote a URL gerada: `https://do-desafio-ao-mvp.onrender.com`.
+> ⚠️ **IMPORTANTE:** Após cada deploy/redeploy, o admin deve acessar `https://SEU-WEB-SERVICE.onrender.com/auth/google/admin` para re-autenticar e salvar os tokens de acesso à planilha. Sem isso, operações de Sheets falharão.
 
 ---
 
@@ -89,7 +106,7 @@ Anote a URL gerada: `https://do-desafio-ao-mvp.onrender.com`.
 | Campo | Valor |
 |-------|-------|
 | **Name** | `desafio-mvp` |
-| **Branch** | `main` |
+| **Branch** | `feat/google-sheets-migration` |
 | **Build Command** | `npm install && npm run build` |
 | **Publish Directory** | `dist` |
 | **Plan** | `Free` |
@@ -98,46 +115,35 @@ Anote a URL gerada: `https://do-desafio-ao-mvp.onrender.com`.
 
 | Variável | Valor |
 |----------|-------|
-| `VITE_SUPABASE_URL` | `https://yduaeewtixrxdgbhyety.supabase.co` |
-| `VITE_SUPABASE_ANON_KEY` | `sb_publishable_sjaQUsC4Sk3XtiEhkjG7nw_TU-S8Lzx` |
-| `VITE_API_URL` | `https://do-desafio-ao-mvp.onrender.com` |
+| `VITE_API_URL` | `https://SEU-WEB-SERVICE.onrender.com` |
 
-### 3.3 Deploy
+### 3.3 Rewrite Rules (SPA routing)
+
+O arquivo `public/_redirects` já está configurado para redirecionar todas as rotas para `index.html`. Isso é essencial para que rotas como `/admin`, `/team`, `/skill-editor` funcionem corretamente no Static Site.
+
+Se preferir configurar via dashboard: **Redirects/Rewrites → Add Rule:**
+- Source: `/*`
+- Destination: `/index.html`
+- Action: **Rewrite**
+
+### 3.4 Deploy
 
 Clique **Create Static Site**.
 
-URL gerada: `https://desafio-mvp.onrender.com`.
-
-> ⚠️ Após criar o Static Site, vá no **Web Service** e **redeploy** manual para aplicar a mudança do `FRONTEND_URL`.
+> ⚠️ Após criar o Static Site, vá no **Web Service** e faça redeploy manual para atualizar `FRONTEND_URL` e `GOOGLE_REDIRECT_URI`.
 
 ---
 
-## Etapa 4 — Configurar CORS e Redirect URIs
+## Etapa 4 — Configurar Redirect URIs
 
-### 4.1 Variável FRONTEND_URL no backend
+### 4.1 Google OAuth — Redirect URI de produção
 
-Edite o Web Service no Render:
-1. Vá em **Environment → Environment Variables**
-2. Atualize `FRONTEND_URL` para a URL do Static Site (`https://desafio-mvp.onrender.com`)
-3. Clique **Save Changes** — o Render faz redeploy automático
-
-### 4.2 Google OAuth — Redirect URIs
-
-No [Google Cloud Console](https://console.cloud.google.com):
-1. **APIs & Services → Credentials**
-2. Selecione o OAuth Client ID usado pelo Supabase
+1. [Google Cloud Console → Credentials](https://console.cloud.google.com/apis/credentials)
+2. Edite o OAuth Client ID
 3. Adicione em **Authorized redirect URIs**:
-
-```
-https://yduaeewtixrxdgbhyety.supabase.co/auth/v1/callback
-```
-
-### 4.3 Supabase Auth — Redirect URLs
-
-No Supabase Dashboard:
-1. **Authentication → URL Configuration**
-2. Em **Site URL**: `https://desafio-mvp.onrender.com`
-3. Em **Redirect URLs**: adicione `https://desafio-mvp.onrender.com`
+   ```
+   https://SEU-WEB-SERVICE.onrender.com/auth/google/callback
+   ```
 
 ---
 
@@ -146,39 +152,25 @@ No Supabase Dashboard:
 ### Health check
 
 ```bash
-curl https://do-desafio-ao-mvp.onrender.com/api/health
+curl https://SEU-WEB-SERVICE.onrender.com/api/health
 # → {"status":"ok"}
 ```
 
-### Teste completo
+### Fluxo completo
 
 1. Acesse `https://desafio-mvp.onrender.com`
-2. Faça login com Google
-3. Verifique redirecionamento correto (admin → `/admin`, member → `/team` ou `/waiting`)
-4. Crie um time, envie mensagem no chat, confirme resposta da IA
+2. Clique "Entrar com Google"
+3. O backend redireciona para o Google → callback → cookie de sessão
+4. Admin → `/admin`, member → `/team` ou `/waiting`
+5. Crie um time, envie mensagem no chat, confirme resposta da IA
 
 ### Logs do backend
 
-Para debug, veja os logs do Web Service no Render:
 **Dashboard → desafio-mvp-web-service → Logs**
 
 ---
 
 ## Manutenção
-
-### Atualizar schema do banco
-
-Após alterar `prisma/schema.prisma`:
-
-```bash
-DATABASE_URL="postgresql://..." npx prisma db push
-```
-
-### Novo seed
-
-```bash
-DATABASE_URL="postgresql://..." npx prisma db seed
-```
 
 ### Redeploy manual
 
@@ -190,13 +182,13 @@ No Render, vá ao serviço → **Manual Deploy → Deploy latest commit**.
 
 | Recurso | Limite Free Render | Mitigação |
 |---------|-------------------|-----------|
-| **Tempo ativo** | Web Service dorme após 15 min inatividade | O primeiro acesso após inatividade leva ~30s (cold start) |
-| **Tempo mensal** | 750 horas/mês | Suficiente para um serviço ligado 24h (~31 dias) |
-| **Banco** | — | Usar Supabase (esquema separado) |
+| **Tempo ativo** | Web Service dorme após 15 min inatividade | Primeiro acesso leva ~30s (cold start) |
+| **Tempo mensal** | 750 horas/mês | Suficiente para 24/7 |
+| **Banco** | — | Google Sheets (gratuito, sem limite de requisições razoável) |
 | **SSL** | Automático | Incluso |
 | **CDN** | Global (via Render) | Frontend estático servido via edge |
 
-Para evitar cold start em horário comercial, é possível configurar **cron job** (ex: [cron-job.org](https://cron-job.org)) pingando `/api/health` a cada 5 min.
+Para evitar cold start, configure um cron job (ex: [cron-job.org](https://cron-job.org)) pingando `/api/health` a cada 5 min.
 
 ---
 
@@ -213,14 +205,16 @@ Para evitar cold start em horário comercial, é possível configurar **cron job
 ┌──────────────────────────────────────────────────┐
 │           Render Web Service                       │
 │  https://do-desafio-ao-mvp.onrender.com            │
-│  Node.js + Express + Prisma + Gemini SDK           │
-│  Porta 3001 (definida pelo Render)                 │
+│  Node.js + Express + googleapis + Gemini SDK       │
+│  cookie-session (sessão em cookie assinado)        │
+│  Porta 10000 (definida pelo Render)                │
 └──────────┬─────────────────────────────────────────┘
            │
            ▼
 ┌──────────────────────────────────────────────────┐
-│           Supabase PostgreSQL                      │
-│  Banco gerenciado + Auth (Google OAuth)            │
-│  db.yduaeewtixrxdgbhyety.supabase.co:5432          │
+│           Google Sheets (via API)                  │
+│  7 abas = PROFILES, TEAMS, TEAM_MEMBERS,          │
+│  CHAT_MESSAGES, TEAM_PROGRESS,                    │
+│  SKILL_VERSIONS, SKILL_AUDIT_LOG                  │
 └──────────────────────────────────────────────────┘
 ```

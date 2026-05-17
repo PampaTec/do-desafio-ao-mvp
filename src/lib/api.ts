@@ -1,19 +1,11 @@
-import { supabase } from './supabase'
-
-async function getToken() {
-  const { data } = await supabase.auth.getSession()
-  return data.session?.access_token ?? ''
-}
-
 const API_BASE = import.meta.env.VITE_API_URL ?? ''
 
 async function api<T = unknown>(path: string, options: RequestInit = {}): Promise<T> {
-  const token = await getToken()
   const res = await fetch(`${API_BASE}${path}`, {
     ...options,
+    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...options.headers,
     },
   })
@@ -72,11 +64,7 @@ interface SkillVersion {
 }
 
 export const authApi = {
-  login: (access_token: string) =>
-    api<{ profile: Profile; hasTeam: boolean; team: Team | null }>('/api/auth/login', {
-      method: 'POST',
-      body: JSON.stringify({ access_token }),
-    }),
+  status: () => api<{ authenticated: boolean; profile?: Profile }>('/auth/status'),
 }
 
 export const teamsApi = {
@@ -92,6 +80,13 @@ export const teamsApi = {
     api<void>(`/api/teams/${id}/advance`, { method: 'PATCH' }),
   delete: (id: string) =>
     api<void>(`/api/teams/${id}`, { method: 'DELETE' }),
+  addMember: (teamId: string, email: string) =>
+    api<{ message: string }>(`/api/teams/${teamId}/members`, {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    }),
+  removeMember: (teamId: string, memberId: string) =>
+    api<{ message: string }>(`/api/teams/${teamId}/members/${memberId}`, { method: 'DELETE' }),
 }
 
 export const chatApi = {

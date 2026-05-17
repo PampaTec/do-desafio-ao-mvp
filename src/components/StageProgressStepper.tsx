@@ -17,7 +17,7 @@ export function StageProgressStepper({ currentStage, progress }: Props) {
   const progressMap = new Map(progress.map(p => [p.stage, p.status]))
 
   return (
-    <div className="flex gap-1 overflow-x-auto py-2 px-1">
+    <div className="flex justify-center gap-1 overflow-x-auto py-2 px-1">
       {STAGES.map((s, i) => {
         const status = progressMap.get(s.num) ?? 'pending'
 
