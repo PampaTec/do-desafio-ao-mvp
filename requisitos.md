@@ -34,7 +34,7 @@ Crie uma aplicação web full-stack chamada **"Desafio ao MVP"** para o **PampaT
 - **Backend:** Node.js + Express + TypeScript
 - **Banco de dados:** PostgreSQL (Supabase)
 - **ORM:** Prisma
-- **IA:** Gemini API — modelo `gemini-2.5-pro` (ou mais recente disponível). O usuário faz login com Google (OAuth) e o backend utiliza o token de acesso OAuth para chamar a Gemini API em nome do usuário, consumindo a cota da própria conta Google do usuário. O escopo OAuth deve incluir permissão para a Gemini API.
+- **IA:** Gemini API — modelo `gemini-2.0-flash` (cota gratuita generosa, ideal para MVP). O usuário faz login com Google (OAuth) e o backend utiliza o token de acesso OAuth para chamar a Gemini API em nome do usuário, consumindo a cota da própria conta Google do usuário. O escopo OAuth deve incluir permissão para a Gemini API.
 - **Autenticação:** Supabase Auth (Google OAuth)
 - **Deploy:** Render.com (100% gratuito) + Supabase (camada gratuita)
 
@@ -445,9 +445,9 @@ o schema, e a Gemini API é consumida via chave de API (fallback).
 
 | Atividade | Status | Descrição |
 |-----------|--------|-----------|
-| 8.1 Deploy Backend no Render | ⏳ | Web Service Node.js |
-| 8.2 Deploy Frontend no Render | ⏳ | Static Site |
-| 8.3 Supabase produção | ⏳ | Google OAuth configurado, migrations aplicadas |
+| 8.1 Deploy Backend no Render | 📄 | Guia completo em `deploy-render.md` |
+| 8.2 Deploy Frontend no Render | 📄 | Guia completo em `deploy-render.md` |
+| 8.3 Supabase produção | 📄 | Guia completo em `deploy-render.md` |
 
 ---
 
@@ -514,5 +514,48 @@ Itens descritos no escopo original que **NÃO** foram implementados ou estão in
 | G9 | **Envio de e-mail com magic link** | Criação de time | ❌ | `invitedEmail` é salvo, mas nenhum e-mail é disparado |
 | G10 | **Logotipo PampaTec (SVG/PNG oficial)** | Global | ⚠️ | Usa SVG genérico (retângulos verdes) em vez do `logo-pampatec.png` ou SVG inline oficial |
 | G11 | **Credenciais Supabase reais** | `.env` / `.env.local` | ❌ | Placeholders `sua_chave_*` — autenticação Google OAuth não funcional sem config |
-| G12 | **Chave Gemini API real** | `.env` | ❌ | Placeholder `sua_chave_gemini` — chat retorna fallback do system prompt |
+| G12 | **Chave Gemini API real** | `.env` | ✅ | Trocado para `gemini-2.0-flash` (cota gratuita ~10x maior que 2.5-pro). Chave configurada e funcional. |
 | G13 | **Testes automatizados** | — | ❌ | Nenhum teste (unit, integration, e2e) implementado |
+| G14 | **Exportar jornada (.md)** | `/team` | ❌ | Planejado para próxima sprint (Alternativa 2) |
+| G15 | **Rodízio de chaves Gemini** | Backend | ❌ | Planejado para próxima sprint se necessário (Alternativa 1) |
+
+---
+
+## PRÓXIMA SPRINT — Exportar Jornada (.md)
+
+### Alternativa 2 — Download da Jornada (sempre disponível)
+
+Botão "Exportar Jornada" na página `/team` disponível em **qualquer momento** (não apenas quando a cota acabar).
+
+**O que deve gerar:**
+```
+# Jornada: [nome do projeto]
+## Etapa atual: [N]/7
+## Progresso
+- ✅ Etapa 1 — CYNEFIN
+- 🔄 Etapa 2 — Empatia
+- ⬜ Etapa 3 — 5 Porquês
+...
+
+## Conteúdo da Skill do Consultor
+[skill ativa na íntegra]
+
+## Histórico do Chat
+**Você:** mensagem do usuário
+**Consultor:** resposta da IA
+...
+```
+
+### Tarefas
+
+| # | Atividade | Descrição |
+|---|-----------|-----------|
+| E1 | Endpoint `GET /api/chat/:teamId/export` | Monta o .md e retorna como download |
+| E2 | Botão "Exportar Jornada" no `/team` | Ao lado do input de mensagem ou no header |
+| E3 | Download automático | `Blob` + `URL.createObjectURL` no frontend |
+| E4 | Nome do arquivo | `jornada-[projeto]-[data].md` |
+| E5 | Atualizar G14 no documento | Mover de ❌ para ✅ |
+
+### Observação
+
+Se a procura por mais cota crescer, implementar também a **Alternativa 1** (rodízio de chaves Gemini com tabela `gemini_keys` e fallback automático).
