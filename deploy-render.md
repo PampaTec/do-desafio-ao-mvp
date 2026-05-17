@@ -18,18 +18,22 @@
 ### 1.1 Obter a connection string do banco
 
 1. Supabase Dashboard → **Project Settings → Database**
-2. Em **Connection string → Node.js** copie a URI : postgresql://postgres:.!@w2R9J%6eCg3N@db.yduaeewtixrxdgbhyety.supabase.co:5432/postgres
+2. Em **Connection string → Node.js** copie a URI ou use a senha definida no reset
 3. Anote — será usada no backend em produção
+
+> ⚠️ **Nota:** Se seu ISP não tem IPv6, o comando `prisma db push` não funcionará localmente.
+> Use o **SQL Editor** do Supabase Dashboard (ver `prisma/schema.prisma` para criar as tabelas manualmente).
 
 ### 1.2 Aplicar schema e seed
 
-Conecte-se ao banco remoto para criar as tabelas e popular dados iniciais:
+Se tiver IPv6, execute no terminal:
 
 ```bash
-# No seu terminal local, execute apontando para o banco do Supabase
-DATABASE_URL="postgresql://postgres:.!@w2R9J%6eCg3N@db.yduaeewtixrxdgbhyety.supabase.co:5432/postgres" npx prisma db push
-DATABASE_URL="postgresql://postgres:.!@w2R9J%6eCg3N@db.yduaeewtixrxdgbhyety.supabase.co:5432/postgres" npx prisma db seed
+DATABASE_URL="postgresql://postgres:PampaTec2026@db.yduaeewtixrxdgbhyety.supabase.co:5432/postgres" npx prisma db push
+DATABASE_URL="postgresql://postgres:PampaTec2026@db.yduaeewtixrxdgbhyety.supabase.co:5432/postgres" npx prisma db seed
 ```
+
+Caso contrário, abra **Supabase Dashboard → SQL Editor** e execute os SQLs de `prisma/schema.prisma` e `prisma/seed.ts`.
 
 Isso cria as 7 tabelas + admin `emersonrizzatti@unipampa.edu.br` + skill inicial.
 
@@ -45,8 +49,8 @@ Isso cria as 7 tabelas + admin `emersonrizzatti@unipampa.edu.br` + skill inicial
 
 | Campo | Valor |
 |-------|-------|
-| **Name** | `desafio-ao-mvp-api` |
-| **Region** | `Frankfurt (EU)` (menor latência Brazil) |
+| **Name** | `desafio-mvp-web-service` |
+| **Region** | `Oregon (US West)` (menor latência Brazil) |
 | **Branch** | `main` |
 | **Runtime** | `Node` |
 | **Build Command** | `npm install && npx prisma generate` |
@@ -59,18 +63,18 @@ Adicione em **Environment Variables**:
 
 | Variável | Valor |
 |----------|-------|
-| `SUPABASE_URL` | URL do seu projeto Supabase (`https://xxxxx.supabase.co`) |
-| `SUPABASE_SERVICE_ROLE_KEY` | Service role key do Supabase |
-| `DATABASE_URL` | Connection string PostgreSQL do Supabase |
-| `FRONTEND_URL` | URL do frontend (colocar depois do deploy: `https://desafio-ao-mvp.onrender.com`) |
-| `GEMINI_API_KEY` | Chave da Gemini API |
+| `SUPABASE_URL` | URL do seu projeto Supabase (`https://yduaeewtixrxdgbhyety.supabase.co`) |
+| `SUPABASE_SERVICE_ROLE_KEY` | eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlkdWFlZXd0aXhyeGRnYmh5ZXR5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3ODk5MDM3MCwiZXhwIjoyMDk0NTY2MzcwfQ.nR-DyUvZLARxMVmL8CKwVUxotvY-OSuu52vWKIayMwo |
+| `DATABASE_URL` | postgresql://postgres:PampaTec2026@db.yduaeewtixrxdgbhyety.supabase.co:5432/postgres |
+| `FRONTEND_URL` | `https://desafio-mvp.onrender.com` |
+| `GEMINI_API_KEY` | `AIza...` (chave da Gemini API) |
 | `NODE_VERSION` | `22` |
 
 ### 2.3 Deploy
 
 Clique **Create Web Service**. O Render vai fazer o build e deploy automático.
 
-Anote a URL gerada (ex: `https://desafio-ao-mvp-api.onrender.com`).
+Anote a URL gerada: `https://do-desafio-ao-mvp.onrender.com`.
 
 ---
 
@@ -84,24 +88,27 @@ Anote a URL gerada (ex: `https://desafio-ao-mvp-api.onrender.com`).
 
 | Campo | Valor |
 |-------|-------|
-| **Name** | `desafio-ao-mvp` |
+| **Name** | `desafio-mvp` |
 | **Branch** | `main` |
 | **Build Command** | `npm install && npm run build` |
 | **Publish Directory** | `dist` |
 | **Plan** | `Free` |
 
-### 3.2 Variável de Ambiente
+### 3.2 Variáveis de Ambiente
 
 | Variável | Valor |
 |----------|-------|
-| `VITE_SUPABASE_URL` | URL do seu projeto Supabase |
-| `VITE_SUPABASE_ANON_KEY` | Anon key do Supabase |
+| `VITE_SUPABASE_URL` | `https://yduaeewtixrxdgbhyety.supabase.co` |
+| `VITE_SUPABASE_ANON_KEY` | `sb_publishable_sjaQUsC4Sk3XtiEhkjG7nw_TU-S8Lzx` |
+| `VITE_API_URL` | `https://do-desafio-ao-mvp.onrender.com` |
 
 ### 3.3 Deploy
 
 Clique **Create Static Site**.
 
-Anote a URL gerada (ex: `https://desafio-ao-mvp.onrender.com`).
+URL gerada: `https://desafio-mvp.onrender.com`.
+
+> ⚠️ Após criar o Static Site, vá no **Web Service** e **redeploy** manual para aplicar a mudança do `FRONTEND_URL`.
 
 ---
 
@@ -111,7 +118,7 @@ Anote a URL gerada (ex: `https://desafio-ao-mvp.onrender.com`).
 
 Edite o Web Service no Render:
 1. Vá em **Environment → Environment Variables**
-2. Atualize `FRONTEND_URL` para a URL do Static Site (`https://desafio-ao-mvp.onrender.com`)
+2. Atualize `FRONTEND_URL` para a URL do Static Site (`https://desafio-mvp.onrender.com`)
 3. Clique **Save Changes** — o Render faz redeploy automático
 
 ### 4.2 Google OAuth — Redirect URIs
@@ -129,8 +136,8 @@ https://yduaeewtixrxdgbhyety.supabase.co/auth/v1/callback
 
 No Supabase Dashboard:
 1. **Authentication → URL Configuration**
-2. Em **Site URL**: `https://desafio-ao-mvp.onrender.com`
-3. Em **Redirect URLs**: adicione `https://desafio-ao-mvp.onrender.com`
+2. Em **Site URL**: `https://desafio-mvp.onrender.com`
+3. Em **Redirect URLs**: adicione `https://desafio-mvp.onrender.com`
 
 ---
 
@@ -139,16 +146,21 @@ No Supabase Dashboard:
 ### Health check
 
 ```bash
-curl https://desafio-ao-mvp-api.onrender.com/api/health
+curl https://do-desafio-ao-mvp.onrender.com/api/health
 # → {"status":"ok"}
 ```
 
 ### Teste completo
 
-1. Acesse `https://desafio-ao-mvp.onrender.com`
+1. Acesse `https://desafio-mvp.onrender.com`
 2. Faça login com Google
 3. Verifique redirecionamento correto (admin → `/admin`, member → `/team` ou `/waiting`)
 4. Crie um time, envie mensagem no chat, confirme resposta da IA
+
+### Logs do backend
+
+Para debug, veja os logs do Web Service no Render:
+**Dashboard → desafio-mvp-web-service → Logs**
 
 ---
 
@@ -193,20 +205,22 @@ Para evitar cold start em horário comercial, é possível configurar **cron job
 ```
 ┌──────────────────────────────────────────────────┐
 │              Render Static Site                    │
-│  https://desafio-ao-mvp.onrender.com               │
-│  (Vite build → dist/ → servido como SPA)           │
+│  https://desafio-mvp.onrender.com                  │
+│  (Vite build → dist/ → servido como SPA)          │
 └──────────┬─────────────────────────────────────────┘
-           │ fetch /api/*
+           │ fetch /api/* via VITE_API_URL
            ▼
 ┌──────────────────────────────────────────────────┐
 │           Render Web Service                       │
-│  https://desafio-ao-mvp-api.onrender.com           │
+│  https://do-desafio-ao-mvp.onrender.com            │
 │  Node.js + Express + Prisma + Gemini SDK           │
+│  Porta 3001 (definida pelo Render)                 │
 └──────────┬─────────────────────────────────────────┘
            │
            ▼
 ┌──────────────────────────────────────────────────┐
 │           Supabase PostgreSQL                      │
 │  Banco gerenciado + Auth (Google OAuth)            │
+│  db.yduaeewtixrxdgbhyety.supabase.co:5432          │
 └──────────────────────────────────────────────────┘
 ```
