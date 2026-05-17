@@ -14,7 +14,7 @@ export function Header({ title }: Props) {
       <div className="max-w-6xl mx-auto flex items-center justify-between">
         <button onClick={() => navigate('/')} className="flex items-center gap-2">
           <img src="/logo-pampatec.png" alt="PampaTec" className="h-6" />
-          <span className="text-dark-text font-bold text-sm">PampaTec</span>
+          <span className="text-dark-text font-bold text-sm">Desafio ao MVP</span>
           {title && <span className="text-secondary text-xs ml-2 hidden sm:inline">· {title}</span>}
         </button>
 

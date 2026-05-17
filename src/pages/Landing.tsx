@@ -22,7 +22,7 @@ export function Landing() {
       <div className="flex flex-col items-center gap-6 max-w-sm text-center">
         <div className="flex items-center gap-2">
           <img src="/logo-pampatec.png" alt="PampaTec" className="h-10" />
-          <span className="text-dark-text text-2xl font-bold tracking-wide">PampaTec</span>
+          <span className="text-dark-text text-2xl font-bold tracking-wide">Desafio ao MVP</span>
         </div>
 
         <p className="text-secondary text-sm leading-relaxed">
