@@ -102,7 +102,7 @@ router.post('/:teamId', requireAuth, async (req: AuthRequest, res) => {
     try {
       const genAI = createGeminiClient(apiKey)
       const model = genAI.getGenerativeModel({
-        model: 'gemini-2.0-flash',
+        model: 'gemini-2.5-flash',
         systemInstruction: systemContent,
       })
 
