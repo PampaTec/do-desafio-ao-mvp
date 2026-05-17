@@ -21,12 +21,7 @@ export function Landing() {
     <div className="flex flex-col items-center justify-center min-h-screen bg-dark-bg px-6">
       <div className="flex flex-col items-center gap-6 max-w-sm text-center">
         <div className="flex items-center gap-2">
-          <svg width="40" height="40" viewBox="0 0 40 40">
-            <rect x="0" y="20" width="8" height="20" fill="#00A859" rx="2" />
-            <rect x="10" y="10" width="8" height="30" fill="#00A859" rx="2" />
-            <rect x="20" y="0" width="8" height="40" fill="#00A859" rx="2" />
-            <rect x="30" y="15" width="8" height="25" fill="#00A859" rx="2" />
-          </svg>
+          <img src="/logo-pampatec.png" alt="PampaTec" className="h-10" />
           <span className="text-dark-text text-2xl font-bold tracking-wide">PampaTec</span>
         </div>
 

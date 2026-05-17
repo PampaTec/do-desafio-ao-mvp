@@ -106,20 +106,18 @@ router.post('/:teamId', requireAuth, async (req: AuthRequest, res) => {
       }
 
       res.json({ userMessage, aiMessage, content: cleanContent, stageCompleted })
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Gemini API error:', err)
-      const fallback = `*IA temporariamente indisponível. Use uma chave Gemini API válida em GEMINI_API_KEY.*\n\nSystem prompt gerado:\n\n${systemContent}`
-      const aiMessage = await prisma.chatMessage.create({
-        data: { teamId, role: 'assistant', content: fallback },
+      const isQuota = err && typeof err === 'object' && 'status' in err &&
+        (err as { status: number }).status === 429
+      res.status(isQuota ? 429 : 503).json({
+        error: isQuota
+          ? 'Cota de uso da IA excedida. Aguarde alguns minutos ou contate o administrador.'
+          : 'IA temporariamente indisponível. Tente novamente em instantes.',
       })
-      res.json({ userMessage, aiMessage, content: fallback })
     }
   } else {
-    const fallback = `System prompt gerado:\n\n${systemContent}`
-    const aiMessage = await prisma.chatMessage.create({
-      data: { teamId, role: 'assistant', content: fallback },
-    })
-    res.json({ userMessage, aiMessage, content: fallback })
+    res.status(503).json({ error: 'Chave da API Gemini não configurada. Contate o administrador.' })
   }
 })
 

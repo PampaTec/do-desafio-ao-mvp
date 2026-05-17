@@ -389,7 +389,7 @@ o schema, e a Gemini API é consumida via chave de API (fallback).
 
 | Atividade | Status | Descrição |
 |-----------|--------|-----------|
-| 2.1 Supabase Auth + Google OAuth | 🔧 | Configurado no frontend; requer credenciais Supabase |
+| 2.1 Supabase Auth + Google OAuth | ⚠️ | Configurado no frontend e backend; requer credenciais Supabase reais (placeholder `.env`) |
 | 2.2 AuthContext + ProtectedRoute | ✅ | Provider de sessão, rotas protegidas por role |
 | 2.3 Landing `/` | ✅ | Logo PampaTec + "Entrar com Google" |
 | 2.4 Redirecionamento condicional | ✅ | role=admin → `/admin`, member c/ time → `/team`, member s/ time → `/waiting` |
@@ -419,8 +419,8 @@ o schema, e a Gemini API é consumida via chave de API (fallback).
 
 | Atividade | Status | Descrição |
 |-----------|--------|-----------|
-| 5.1 Editor de Skill (`/skill-editor`) | ✅ | Edição de markdown + versionamento |
-| 5.2 Salvar versão | ✅ | Recontruir, salvar em `skill_versions`, ativar |
+| 5.1 Editor de Skill (`/skill-editor`) | ✅ | Editor funcional, mas implementado como textarea Markdown bruto (NÃO o formulário estruturado em abas descrito abaixo) |
+| 5.2 Salvar versão | ✅ | Salva em `skill_versions`, ativa, registra audit log |
 | 5.3 Limite de 5 versões | ✅ | Versão não-ativa mais antiga descartada |
 | 5.4 Restaurar versão | ✅ | Rollback com 1 clique |
 | 5.5 Audit log | ✅ | Registro em `skill_audit_log` |
@@ -494,3 +494,25 @@ VITE_SUPABASE_ANON_KEY=sua_chave_anon
 **Nota:** A Gemini API é chamada com chave de API (`GEMINI_API_KEY`) no ambiente local.
 Em produção, pode-se usar o token OAuth do usuário logado (escopo Gemini),
 configurado via Supabase e Google Cloud Console.
+
+---
+
+## LACUNAS IDENTIFICADAS (entre o especificado e o implementado)
+
+Itens descritos no escopo original que **NÃO** foram implementados ou estão incompletos:
+
+| # | Item | Onde | Status | Observação |
+|---|------|------|--------|------------|
+| G1 | **Editor de Skill estruturado em abas** | `/skill-editor` | ❌ | Implementado como textarea Markdown bruto, não como formulário com campos por etapa (Perfil, Etapas 1–7, Análise, Prompt Final) |
+| G2 | **Streaming da resposta da IA** | `/team` (chat) | ❌ | `chat.sendMessage` aguarda resposta completa; não há SSE/chunk streaming na UI |
+| G3 | **Botão "Testar Skill"** | `/skill-editor` | ❌ | Modal de chat simulado não implementado |
+| G4 | **Indicador "Skill em uso por X times"** | `/skill-editor` | ❌ | Rota `/api/stats` retorna `skillsUsing`, mas não é exibido no editor |
+| G5 | **Adicionar/Remover membros** | `/admin/team/:id` | ❌ | Apenas exibe membros; sem botão add/remove |
+| G6 | **Arquivar/Pausar time** | `/admin/team/:id` | ❌ | Apenas "Excluir" disponível; sem opção de pausar/arquivar |
+| G7 | **Auto-redirect `/waiting` → `/team`** | `/waiting` | ❌ | Sem polling para detectar criação do time |
+| G8 | **Botão "Avançar etapa" no chat do membro** | `/team` | ❌ | Botão existe apenas no admin; membro não consegue solicitar avanço manual |
+| G9 | **Envio de e-mail com magic link** | Criação de time | ❌ | `invitedEmail` é salvo, mas nenhum e-mail é disparado |
+| G10 | **Logotipo PampaTec (SVG/PNG oficial)** | Global | ⚠️ | Usa SVG genérico (retângulos verdes) em vez do `logo-pampatec.png` ou SVG inline oficial |
+| G11 | **Credenciais Supabase reais** | `.env` / `.env.local` | ❌ | Placeholders `sua_chave_*` — autenticação Google OAuth não funcional sem config |
+| G12 | **Chave Gemini API real** | `.env` | ❌ | Placeholder `sua_chave_gemini` — chat retorna fallback do system prompt |
+| G13 | **Testes automatizados** | — | ❌ | Nenhum teste (unit, integration, e2e) implementado |

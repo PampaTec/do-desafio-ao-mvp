@@ -44,6 +44,11 @@ router.post('/login', async (req, res) => {
     })
   }
 
+  await prisma.teamMember.updateMany({
+    where: { invitedEmail: email, userId: null },
+    data: { userId: user.id },
+  })
+
   const team = await prisma.teamMember.findFirst({
     where: { userId: user.id },
     include: { team: true },

@@ -31,6 +31,7 @@ export function MemberChat() {
   const [loading, setLoading] = useState(true)
   const endRef = useRef<HTMLDivElement>(null)
   const [typing, setTyping] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const scrollToBottom = useCallback(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -84,6 +85,7 @@ export function MemberChat() {
     }])
 
     try {
+      setError(null)
       const result = await chatApi.send(team.id, content)
 
       if (result.aiMessage) {
@@ -108,7 +110,9 @@ export function MemberChat() {
         showToast(`Etapa ${result.stageCompleted} concluída!`, 'success')
       }
     } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Erro ao enviar mensagem', 'error')
+      const msg = err instanceof Error ? err.message : 'Erro ao enviar mensagem'
+      setError(msg)
+      showToast(msg, 'error')
     } finally {
       setSending(false)
       setTyping(false)
@@ -148,6 +152,11 @@ export function MemberChat() {
             timestamp={new Date(msg.createdAt).toLocaleString('pt-BR')}
           />
         ))}
+        {error && (
+          <div className="bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-3 text-red-400 text-sm text-center">
+            {error}
+          </div>
+        )}
         {typing && (
           <div className="flex gap-3">
             <div className="flex-shrink-0 w-8 h-8 rounded-full bg-dark-card border border-secondary flex items-center justify-center text-sm">

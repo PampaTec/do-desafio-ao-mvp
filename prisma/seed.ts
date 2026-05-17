@@ -15,7 +15,7 @@ async function main() {
     create: {
       id: adminId,
       googleId: 'admin-pampatec',
-      email: 'admin@pampatec.org',
+      email: 'emersonrizzatti@unipampa.edu.br',
       name: 'Equipe PampaTec',
       role: 'admin',
     },
