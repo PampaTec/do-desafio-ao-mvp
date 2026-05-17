@@ -5,9 +5,11 @@ async function getToken() {
   return data.session?.access_token ?? ''
 }
 
+const API_BASE = import.meta.env.VITE_API_URL ?? ''
+
 async function api<T = unknown>(path: string, options: RequestInit = {}): Promise<T> {
   const token = await getToken()
-  const res = await fetch(path, {
+  const res = await fetch(`${API_BASE}${path}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
