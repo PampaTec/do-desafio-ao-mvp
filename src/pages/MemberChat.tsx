@@ -47,7 +47,7 @@ export function MemberChat() {
         setTeam(data)
         return chatApi.list(data.id)
       })
-      .then((msgs: Message[] | undefined) => {
+      .then((msgs: Message[] | null | undefined) => {
         if (msgs) setMessages(msgs)
       })
       .catch(console.error)
@@ -88,21 +88,12 @@ export function MemberChat() {
       setError(null)
       const result = await chatApi.send(team.id, content)
 
-      if (result.aiMessage) {
-        setMessages(prev => [...prev, {
-          id: result.aiMessage.id,
-          role: 'assistant',
-          content: result.aiMessage.content,
-          createdAt: result.aiMessage.createdAt,
-        }])
-      } else {
-        setMessages(prev => [...prev, {
-          id: `ai-${Date.now()}`,
-          role: 'assistant',
-          content: result.content,
-          createdAt: new Date().toISOString(),
-        }])
-      }
+      setMessages(prev => [...prev, {
+        id: result.aiMessage.id,
+        role: 'assistant',
+        content: result.aiMessage.content,
+        createdAt: result.aiMessage.createdAt,
+      }])
 
       if (result.stageCompleted) {
         const updated = await teamsApi.my()

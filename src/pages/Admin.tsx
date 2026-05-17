@@ -1,17 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Header } from '../components/Header'
-import { teamsApi, statsApi } from '../lib/api'
-
-interface Team {
-  id: string
-  projectName: string
-  currentStage: number
-  status: string
-  createdAt: string
-  _count: { chatMessages: number }
-  members: { profile: { name: string | null; email: string } | null }[]
-}
+import { teamsApi, statsApi, type Team } from '../lib/api'
 
 interface Stats {
   activeTeams: number

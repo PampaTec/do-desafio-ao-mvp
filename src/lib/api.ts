@@ -31,17 +31,18 @@ interface Profile {
   role: string
 }
 
-interface Team {
+export interface Team {
   id: string
   projectName: string
   currentStage: number
   status: string
   createdAt: string
+  _count?: { chatMessages: number }
   progress: { stage: number; status: string; stageOutput: string | null }[]
   members: { id: string; profile: { name: string | null; email: string } | null; invitedEmail: string | null }[]
 }
 
-interface Message {
+export interface Message {
   id: string
   role: string
   content: string
@@ -50,9 +51,9 @@ interface Message {
 
 interface ChatResponse {
   userMessage: Message
-  aiMessage?: Message
+  aiMessage: Message
   content: string
-  stageCompleted?: number | null
+  stageCompleted: number | null
 }
 
 interface StatData {
@@ -94,7 +95,7 @@ export const teamsApi = {
 }
 
 export const chatApi = {
-  list: (teamId: string) => api<Message[]>(`/api/chat/${teamId}`),
+  list: (teamId: string) => api<Message[] | null>(`/api/chat/${teamId}`),
   send: (teamId: string, content: string) =>
     api<ChatResponse>(`/api/chat/${teamId}`, {
       method: 'POST',

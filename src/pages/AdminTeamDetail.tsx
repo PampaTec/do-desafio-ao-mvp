@@ -1,20 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Header } from '../components/Header'
-import { teamsApi } from '../lib/api'
+import { teamsApi, type Team, type Message } from '../lib/api'
 import { StageProgressStepper } from '../components/StageProgressStepper'
 import { ChatBubble } from '../components/ChatBubble'
 import { showToast } from '../lib/toast'
 
-interface TeamDetail {
-  id: string
-  projectName: string
-  currentStage: number
-  status: string
-  members: { id: string; profile: { name: string | null; email: string } | null; invitedEmail: string | null }[]
-  progress: { stage: number; status: string; stageOutput: string | null }[]
-  chatMessages: { id: string; role: string; content: string; createdAt: string }[]
-}
+type TeamDetail = Team & { chatMessages: Message[] }
 
 export function AdminTeamDetail() {
   const { id } = useParams<{ id: string }>()
@@ -26,8 +18,7 @@ export function AdminTeamDetail() {
     if (!id) return
     teamsApi.get(id)
       .then((data) => {
-        const teamData = data as unknown as TeamDetail
-        setTeam(teamData)
+          setTeam(data)
       })
       .catch(console.error)
       .finally(() => setLoading(false))
@@ -38,7 +29,7 @@ export function AdminTeamDetail() {
     try {
       await teamsApi.advance(id)
       const data = await teamsApi.get(id)
-      setTeam(data as unknown as TeamDetail)
+      setTeam(data)
       showToast('Etapa avançada', 'success')
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Erro ao avançar', 'error')
