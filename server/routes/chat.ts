@@ -1,5 +1,6 @@
 import { Router } from 'express'
-import { GoogleGenerativeAI, type Content } from '@google/generative-ai'
+import { type Content } from '@google/generative-ai'
+import { getAvailableKey, markKeyFailed, markKeySuccess, createGeminiClient, getKeyCount } from '../services/geminiKeyRotation.js'
 import { requireAuth, type AuthRequest } from '../middleware/auth.js'
 import { getAdminTokens } from '../services/tokenStore.js'
 import {
@@ -75,29 +76,41 @@ router.post('/:teamId', requireAuth, async (req: AuthRequest, res) => {
     },
   )
 
-  const geminiApiKey = process.env.GEMINI_API_KEY
-  if (geminiApiKey && geminiApiKey !== 'sua_chave_gemini') {
+  if (getKeyCount() === 0) {
+    res.status(503).json({ error: 'Chave da API Gemini não configurada. Contate o administrador.' })
+    return
+  }
+
+  const history: Content[] = recentMessages
+    .filter(m => m.role !== 'system')
+    .reverse()
+    .slice(0, 20)
+    .reverse()
+    .map(m => ({
+      role: m.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: m.content }],
+    }))
+
+  // Tenta com rodízio de chaves (até 3 tentativas)
+  const maxRetries = Math.min(getKeyCount(), 3)
+  let lastError: unknown = null
+
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    const apiKey = getAvailableKey()
+    if (!apiKey) break
+
     try {
-      const genAI = new GoogleGenerativeAI(geminiApiKey)
+      const genAI = createGeminiClient(apiKey)
       const model = genAI.getGenerativeModel({
         model: 'gemini-2.0-flash',
         systemInstruction: systemContent,
       })
 
-      const history: Content[] = recentMessages
-        .filter(m => m.role !== 'system')
-        .reverse()
-        .slice(0, 20)
-        .reverse()
-        .map(m => ({
-          role: m.role === 'assistant' ? 'model' : 'user',
-          parts: [{ text: m.content }],
-        }))
-
       const chat = model.startChat({ history })
       const result = await chat.sendMessage(content)
-      const response = result.response
-      const aiText = response.text()
+      const aiText = result.response.text()
+
+      markKeySuccess(apiKey)
 
       let stageCompleted: number | null = null
       let cleanContent = aiText
@@ -134,19 +147,27 @@ router.post('/:teamId', requireAuth, async (req: AuthRequest, res) => {
         content: cleanContent,
         stageCompleted,
       })
+      return
     } catch (err: unknown) {
-      console.error('Gemini API error:', err)
-      const isQuota = err && typeof err === 'object' && 'status' in err &&
+      lastError = err
+      const is429 = err && typeof err === 'object' && 'status' in err &&
         (err as { status: number }).status === 429
-      res.status(isQuota ? 429 : 503).json({
-        error: isQuota
-          ? 'Cota de uso da IA excedida. Aguarde alguns minutos ou contate o administrador.'
-          : 'IA temporariamente indisponível. Tente novamente em instantes.',
-      })
+      markKeyFailed(apiKey, !!is429)
+
+      if (!is429) break // Erro não-429 = não adianta tentar outra chave
+      console.warn(`[gemini] Chave bloqueada (429), tentando próxima... (tentativa ${attempt + 1}/${maxRetries})`)
     }
-  } else {
-    res.status(503).json({ error: 'Chave da API Gemini não configurada. Contate o administrador.' })
   }
+
+  // Todas as tentativas falharam
+  console.error('Gemini API error (todas as chaves falharam):', lastError)
+  const is429 = lastError && typeof lastError === 'object' && 'status' in lastError &&
+    (lastError as { status: number }).status === 429
+  res.status(is429 ? 429 : 503).json({
+    error: is429
+      ? 'Cota de uso da IA excedida. Aguarde alguns minutos ou contate o administrador.'
+      : 'IA temporariamente indisponível. Tente novamente em instantes.',
+  })
 })
 
 function buildSystemPrompt(skill: { content_md: string } | null, team: {

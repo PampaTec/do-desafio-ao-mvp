@@ -10,3 +10,4 @@ dist-ssr
 .vscode/*
 !.vscode/extensions.json
 .admin-tokens.json
+.env-render

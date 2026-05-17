@@ -40,7 +40,7 @@
 3. Authorized redirect URIs:
    ```
    http://localhost:3001/auth/google/callback
-   https://SEU-WEB-SERVICE.onrender.com/auth/google/callback
+   https://do-desafio-ao-mvp.onrender.com/auth/google/callback
    ```
 4. Anote o **Client ID** e **Client Secret**
 
@@ -80,7 +80,7 @@ Adicione em **Environment Variables**:
 | `FRONTEND_URL` | `https://desafio-mvp.onrender.com` |
 | `GOOGLE_CLIENT_ID` | Seu Client ID do Google Cloud |
 | `GOOGLE_CLIENT_SECRET` | Seu Client Secret do Google Cloud |
-| `GOOGLE_REDIRECT_URI` | `https://SEU-WEB-SERVICE.onrender.com/auth/google/callback` |
+| `GOOGLE_REDIRECT_URI` | `https://do-desafio-ao-mvp.onrender.com/auth/google/callback` |
 | `PROGRESS_SHEET_ID` | ID da planilha Google (ex: `1gKH4eS4SatIMPrWy2qAGvqc6CtFlLaIdqx87uPbw8Do`) |
 | `ADMIN_EMAIL` | `emersonrizzatti@unipampa.edu.br` |
 | `COOKIE_KEY` | Uma string aleatória forte para assinar cookies (ex: `openssl rand -hex 32`) |
@@ -91,7 +91,7 @@ Adicione em **Environment Variables**:
 
 Clique **Create Web Service**. Anote a URL gerada.
 
-> ⚠️ **IMPORTANTE:** Após cada deploy/redeploy, o admin deve acessar `https://SEU-WEB-SERVICE.onrender.com/auth/google/admin` para re-autenticar e salvar os tokens de acesso à planilha. Sem isso, operações de Sheets falharão.
+> ⚠️ **IMPORTANTE:** Após cada deploy/redeploy, o admin deve acessar `https://do-desafio-ao-mvp.onrender.com/auth/google/admin` para re-autenticar e salvar os tokens de acesso à planilha. Sem isso, operações de Sheets falharão.
 
 ---
 
@@ -115,7 +115,7 @@ Clique **Create Web Service**. Anote a URL gerada.
 
 | Variável | Valor |
 |----------|-------|
-| `VITE_API_URL` | `https://SEU-WEB-SERVICE.onrender.com` |
+| `VITE_API_URL` | `https://do-desafio-ao-mvp.onrender.com` |
 
 ### 3.3 Rewrite Rules (SPA routing)
 
@@ -142,7 +142,7 @@ Clique **Create Static Site**.
 2. Edite o OAuth Client ID
 3. Adicione em **Authorized redirect URIs**:
    ```
-   https://SEU-WEB-SERVICE.onrender.com/auth/google/callback
+   https://do-desafio-ao-mvp.onrender.com/auth/google/callback
    ```
 
 ---
@@ -152,7 +152,7 @@ Clique **Create Static Site**.
 ### Health check
 
 ```bash
-curl https://SEU-WEB-SERVICE.onrender.com/api/health
+curl https://do-desafio-ao-mvp.onrender.com/api/health
 # → {"status":"ok"}
 ```
 
