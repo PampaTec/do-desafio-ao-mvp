@@ -66,7 +66,7 @@ export function Admin() {
                 <div>
                   <h3 className="text-dark-text font-medium">{team.projectName}</h3>
                   <p className="text-secondary text-xs mt-1">
-                    {team.members.length} membro(s) · {team._count.chatMessages} mensagens
+                    {team.members.length} membro(s) · {team._count?.chatMessages ?? 0} mensagens
                   </p>
                 </div>
                 <div className="text-right">
