@@ -159,6 +159,10 @@ function buildSystemPrompt(skill: { content_md: string } | null, team: {
   prompt += `- Outputs registrados: ${completed.map(p => `${p.stage}: ${p.stageOutput ?? '—'}`).join('; ')}\n\n`
 
   prompt += `HISTÓRICO DESTA SESSÃO:\n${history || '(vazio)'}`
+
+  // Instrução rígida para formatar saída e evitar lixo/markdown de LLMs open-source
+  prompt += `\n\nINSTRUÇÕES CRÍTICAS DE FORMATAÇÃO: Quando identificar que os critérios da etapa foram atingidos e a etapa foi concluída, você DEVE retornar APENAS a tag [ETAPA_CONCLUIDA:N] (onde N é o número da etapa). Não inclua explicações, parágrafos, e não use NENHUMA formatação em markdown (como **). Retorne estritamente o texto entre os colchetes e nada mais. Exemplo exato: [ETAPA_CONCLUIDA:2]`
+
   return prompt
 }
 
