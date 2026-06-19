@@ -121,7 +121,7 @@ router.post('/:id/restore', requireAdmin, async (req: AuthRequest, res) => {
 
   const sheets = google.sheets({ version: 'v4', auth: getAuthClient(tokens) })
   const allVersions = await listarSkillVersions(tokens)
-  const idx = allVersions.indexOf(version) + 1
+  const idx = allVersions.findIndex(v => v.id === version.id) + 1
   await sheets.spreadsheets.values.update({
     spreadsheetId: process.env.PROGRESS_SHEET_ID!,
     range: `SKILL_VERSIONS!F${idx}`,
