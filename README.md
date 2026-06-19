@@ -16,7 +16,7 @@ Parte do programa **Startup Pampa** do **PampaTec — Parque Tecnológico do Pam
 | Banco | PostgreSQL 16 (local) / Supabase (produção) |
 | ORM | Prisma 6 |
 | Autenticação | Supabase Auth (Google OAuth) |
-| IA | Gemini API (`gemini-2.5-pro`) |
+| IA | Cloudflare AI Gateway (Workers AI, Groq, DeepSeek — fallback automático) |
 
 ---
 
@@ -36,7 +36,7 @@ Parte do programa **Startup Pampa** do **PampaTec — Parque Tecnológico do Pam
 - Node.js 18+
 - PostgreSQL 16 rodando na porta 5432
 - Projeto no Supabase (free tier) com Google OAuth configurado
-- Chave da Gemini API (ou token OAuth com escopo Gemini)
+- Conta Cloudflare com AI Gateway ativo e API Token
 
 ---
 
@@ -71,7 +71,8 @@ SUPABASE_URL=https://seu-projeto.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=sua_service_role_key
 DATABASE_URL=postgres://user:pass@localhost:5432/desafio_ao_mvp
 FRONTEND_URL=http://localhost:5174
-GEMINI_API_KEY=sua_chave_gemini
+CLOUDFLARE_API_TOKEN=seu_token_cloudflare
+CLOUDFLARE_ACCOUNT_ID=seu_account_id
 ```
 
 ### `.env.local` (frontend)
@@ -162,7 +163,7 @@ npm run dev
    - Conteúdo completo da skill ativa
    - Estado atual da jornada do time
    - Últimas 20 mensagens do histórico
-3. Chama Gemini API (streaming)
+3. Chama Cloudflare AI Gateway (com fallback entre Workers AI, Groq, DeepSeek)
 4. Detecta tag `[ETAPA_CONCLUIDA: N]` → atualiza progresso
 5. Salva resposta e avança stepper na UI
 

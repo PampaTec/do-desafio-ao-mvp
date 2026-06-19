@@ -1,6 +1,5 @@
 import { Router } from 'express'
-import { type Content } from '@google/generative-ai'
-import { getAvailableKey, markKeyFailed, markKeySuccess, createGeminiClient, getKeyCount } from '../services/geminiKeyRotation.js'
+import { callCloudflareAI, isConfigured, getConfigError } from '../services/cloudflareAi.js'
 import { requireAuth, type AuthRequest } from '../middleware/auth.js'
 import { getAdminTokens } from '../services/tokenStore.js'
 import {
@@ -76,98 +75,67 @@ router.post('/:teamId', requireAuth, async (req: AuthRequest, res) => {
     },
   )
 
-  if (getKeyCount() === 0) {
-    res.status(503).json({ error: 'Chave da API Gemini não configurada. Contate o administrador.' })
+  if (!isConfigured()) {
+    res.status(503).json({
+      error: `Cloudflare AI não configurado: ${getConfigError()}. Contate o administrador.`,
+    })
     return
   }
 
-  const history: Content[] = recentMessages
-    .filter(m => m.role !== 'system')
-    .reverse()
-    .slice(0, 20)
-    .reverse()
-    .map(m => ({
-      role: m.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: m.content }],
-    }))
+  const messages = [
+    { role: 'system' as const, content: systemContent },
+    ...recentMessages.map(m => ({
+      role: (m.role === 'assistant' ? 'assistant' : 'user') as 'user' | 'assistant',
+      content: m.content,
+    })),
+    { role: 'user' as const, content },
+  ]
 
-  // Tenta com rodízio de chaves (até 3 tentativas)
-  const maxRetries = Math.min(getKeyCount(), 3)
-  let lastError: unknown = null
+  try {
+    const aiText = await callCloudflareAI(messages)
 
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
-    const apiKey = getAvailableKey()
-    if (!apiKey) break
+    let stageCompleted: number | null = null
+    let cleanContent = aiText
 
-    try {
-      const genAI = createGeminiClient(apiKey)
-      const model = genAI.getGenerativeModel({
-        model: 'gemini-2.5-flash',
-        systemInstruction: systemContent,
-      })
-
-      const chat = model.startChat({ history })
-      const result = await chat.sendMessage(content)
-      const aiText = result.response.text()
-
-      markKeySuccess(apiKey)
-
-      let stageCompleted: number | null = null
-      let cleanContent = aiText
-
-      const stageMatch = aiText.match(/\[ETAPA_CONCLUIDA:\s*(\d)\]/)
-      if (stageMatch) {
-        stageCompleted = parseInt(stageMatch[1])
-        cleanContent = aiText.replace(/\[ETAPA_CONCLUIDA:\s*\d\]/g, '').trim()
-      }
-
-      const aiMsgId = crypto.randomUUID()
-      await salvarMensagemChat({
-        id: aiMsgId,
-        team_id: teamId,
-        role: 'assistant',
-        content: cleanContent,
-        stage: stageCompleted ? String(stageCompleted) : '',
-      }, tokens)
-
-      if (stageCompleted) {
-        const progressItem = allProgress.find(p => parseInt(p.stage) === stageCompleted)
-        if (progressItem) {
-          await atualizarProgresso(progressItem.id, {
-            status: 'completed',
-            stage_output: cleanContent.slice(0, 500),
-            completed_at: new Date().toISOString(),
-          }, tokens)
-        }
-      }
-
-      res.json({
-        userMessage: { id: '', role: 'user', content, createdAt: new Date().toISOString() },
-        aiMessage: { id: aiMsgId, role: 'assistant', content: cleanContent, createdAt: new Date().toISOString() },
-        content: cleanContent,
-        stageCompleted,
-      })
-      return
-    } catch (err: unknown) {
-      lastError = err
-      const is429 = err && typeof err === 'object' && 'status' in err &&
-        (err as { status: number }).status === 429
-      markKeyFailed(apiKey, !!is429)
-
-      if (!is429) break // Erro não-429 = não adianta tentar outra chave
-      console.warn(`[gemini] Chave bloqueada (429), tentando próxima... (tentativa ${attempt + 1}/${maxRetries})`)
+    const stageMatch = aiText.match(/\[ETAPA_CONCLUIDA:\s*(\d)\]/)
+    if (stageMatch) {
+      stageCompleted = parseInt(stageMatch[1])
+      cleanContent = aiText.replace(/\[ETAPA_CONCLUIDA:\s*\d\]/g, '').trim()
     }
-  }
 
-  // Todas as tentativas falharam
-  console.error('Gemini API error (todas as chaves falharam):', lastError)
-  const is429 = lastError && typeof lastError === 'object' && 'status' in lastError &&
-    (lastError as { status: number }).status === 429
-  res.status(is429 ? 429 : 503).json({
-    error: is429
-      ? 'Cota de uso da IA excedida. Aguarde alguns minutos ou contate o administrador.'
-      : 'IA temporariamente indisponível. Tente novamente em instantes.',
-  })
+    const aiMsgId = crypto.randomUUID()
+    await salvarMensagemChat({
+      id: aiMsgId,
+      team_id: teamId,
+      role: 'assistant',
+      content: cleanContent,
+      stage: stageCompleted ? String(stageCompleted) : '',
+    }, tokens)
+
+    if (stageCompleted) {
+      const progressItem = allProgress.find(p => parseInt(p.stage) === stageCompleted)
+      if (progressItem) {
+        await atualizarProgresso(progressItem.id, {
+          status: 'completed',
+          stage_output: cleanContent.slice(0, 500),
+          completed_at: new Date().toISOString(),
+        }, tokens)
+      }
+    }
+
+    res.json({
+      userMessage: { id: '', role: 'user', content, createdAt: new Date().toISOString() },
+      aiMessage: { id: aiMsgId, role: 'assistant', content: cleanContent, createdAt: new Date().toISOString() },
+      content: cleanContent,
+      stageCompleted,
+    })
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Erro desconhecido'
+    console.error('[cloudflare-ai] Erro no chat:', msg)
+    res.status(503).json({
+      error: 'IA temporariamente indisponível. Todos os provedores falharam. Tente novamente em instantes.',
+    })
+  }
 })
 
 function buildSystemPrompt(skill: { content_md: string } | null, team: {
