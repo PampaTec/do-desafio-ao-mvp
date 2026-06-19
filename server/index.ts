@@ -1,5 +1,7 @@
 import 'dotenv/config'
 import express from 'express'
+import path from 'path'
+import { fileURLToPath } from 'url'
 import cors from 'cors'
 import cookieSession from 'cookie-session'
 import authRoutes from './routes/auth.js'
@@ -7,6 +9,8 @@ import teamsRoutes from './routes/teams.js'
 import chatRoutes from './routes/chat.js'
 import skillRoutes from './routes/skill.js'
 import statsRoutes from './routes/stats.js'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 const app = express()
 const PORT = process.env.PORT ?? 3001
@@ -38,6 +42,14 @@ app.use('/api/teams', teamsRoutes)
 app.use('/api/chat', chatRoutes)
 app.use('/api/skill', skillRoutes)
 app.use('/api/stats', statsRoutes)
+
+if (isProd) {
+  const distPath = path.resolve(__dirname, '../dist')
+  app.use(express.static(distPath))
+  app.get('*', (_req, res) => {
+    res.sendFile(path.join(distPath, 'index.html'))
+  })
+}
 
 app.listen(PORT, () => {
   console.log(`Servidor rodando na porta ${PORT}`)
