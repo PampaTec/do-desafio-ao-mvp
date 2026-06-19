@@ -1,7 +1,4 @@
 import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react'
-import { supabase } from '../lib/supabase'
-import { authApi } from '../lib/api'
-import type { Session } from '@supabase/supabase-js'
 
 interface Profile {
   id: string
@@ -11,60 +8,42 @@ interface Profile {
 }
 
 interface AuthContextType {
-  session: Session | null
   profile: Profile | null
   loading: boolean
-  signIn: () => Promise<void>
-  signOut: () => Promise<void>
+  signIn: () => void
+  signOut: () => void
 }
 
 const AuthContext = createContext<AuthContextType | null>(null)
 
+const API_BASE = import.meta.env.VITE_API_URL ?? ''
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [session, setSession] = useState<Session | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
 
-  const fetchProfile = useCallback(async (token: string) => {
-    try {
-      const data = await authApi.login(token)
-      setProfile(data.profile)
-    } catch {
-      setProfile(null)
-    }
+  useEffect(() => {
+    fetch(`${API_BASE}/auth/status`, { credentials: 'include' })
+      .then(res => res.json())
+      .then(data => {
+        if (data.authenticated && data.profile) {
+          setProfile(data.profile)
+        }
+      })
+      .catch(console.error)
+      .finally(() => setLoading(false))
   }, [])
 
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session)
-      if (session) fetchProfile(session.access_token)
-      setLoading(false)
-    })
+  const signIn = useCallback(() => {
+    window.location.href = `${API_BASE}/auth/google/admin`
+  }, [])
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session)
-      if (session) fetchProfile(session.access_token)
-      else setProfile(null)
-    })
-
-    return () => subscription.unsubscribe()
-  }, [fetchProfile])
-
-  async function signIn() {
-    await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: { redirectTo: `${window.location.origin}` },
-    })
-  }
-
-  async function signOut() {
-    await supabase.auth.signOut()
-    setProfile(null)
-    setSession(null)
-  }
+  const signOut = useCallback(() => {
+    window.location.href = `${API_BASE}/auth/logout`
+  }, [])
 
   return (
-    <AuthContext.Provider value={{ session, profile, loading, signIn, signOut }}>
+    <AuthContext.Provider value={{ profile, loading, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   )
